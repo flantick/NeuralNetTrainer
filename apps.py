@@ -8,10 +8,10 @@ from scipy import ndimage
 import matplotlib.pyplot as plt
 
 
-class pleaseDataset(torch.utils.data.IterableDataset):
+class UrDataset(torch.utils.data.IterableDataset):
     def __init__(self, gen_df=None):
         super().__init__()
-        self.gen_df =gen_df
+        self.gen_df = gen_df
 
     def __iter__(self):
         for i in range(len(self.gen_df)):
