@@ -22,6 +22,9 @@ class Segmentator (pl.LightningModule):
         self.val_torch_dataset = val_torch_dataset
         self.pred_torch_dataset = pred_torch_dataset
 
+        self.vl_loss = []
+        self.vl_ac = []
+
     def forward(self, input_ids):
         x = self.model(input_ids)
         return x
@@ -47,6 +50,8 @@ class Segmentator (pl.LightningModule):
 
         metrics = {"val_loss": loss, "val_acc": acc}
         self.log_dict(metrics)
+        self.vl_loss.append(loss)
+        self.vl_ac.append(acc)
 
         return metrics
 
@@ -100,19 +105,21 @@ class Segmentator (pl.LightningModule):
         )
         return pred_dataloader
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         # outputs = list of dictionaries
         # avg = outputs[0]
         # for x in outputs:
         #  avg = torch.cat((avg,x), 0)
 
         # avg_loss = avg.mean()
-        avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        avg_acc = torch.stack([x["val_acc"] for x in outputs]).mean()
+        avg_loss = torch.stack([x["val_loss"] for x in self.vl_loss]).mean()
+        avg_acc = torch.stack([x["val_acc"] for x in self.vl_ac]).mean()
         # tensorboard_logs = {'avg_val_loss': avg_loss}
         # use key 'log'
         print(avg_loss)
         print(avg_acc)
+        self.vl_loss = []
+        self.vl_ac = []
         return {'val_loss': avg_loss, "val_acc": avg_acc  }  # , 'log': tensorboard_logs}
 
     def configure_optimizers(self):
