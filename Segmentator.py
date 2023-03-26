@@ -112,8 +112,8 @@ class Segmentator (pl.LightningModule):
         #  avg = torch.cat((avg,x), 0)
 
         # avg_loss = avg.mean()
-        avg_loss = torch.stack([x["val_loss"] for x in self.vl_loss]).mean()
-        avg_acc = torch.stack([x["val_acc"] for x in self.vl_ac]).mean()
+        avg_loss = torch.stack([x for x in self.vl_loss]).mean()
+        avg_acc = torch.stack([x for x in self.vl_ac]).mean()
         # tensorboard_logs = {'avg_val_loss': avg_loss}
         # use key 'log'
         print(avg_loss)
