@@ -149,8 +149,8 @@ class Segmenter (pl.LightningModule):
         avg_acc = torch.stack([x for x in self.vl_ac]).mean()
         # tensorboard_logs = {'avg_val_loss': avg_loss}
         # use key 'log'
-        print(avg_loss)# ТУТ НУЖНО СДЕЛАТЬ КРАСИВЕЕ
-        print(avg_acc)#
+        print('\n=======\n' + 'Mean validation loss ' + avg_loss.__str__()[7:13])
+        print('\nMean validation accuracy '+avg_acc.__str__()[7:13]+'\n=======\n')
         self.vl_loss = []
         self.vl_ac = []
         return {'val_loss': avg_loss, "val_acc": avg_acc}  # , 'log': tensorboard_logs}
