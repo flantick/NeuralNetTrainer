@@ -5,8 +5,32 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import pytorch_lightning as pl
 
 
+class Segmenter (pl.LightningModule):
+    '''
+    Segmenter fine-tune neural net to segments images.
+    You need to prepare the dataset and backbone in advance.
 
-class Segmentator (pl.LightningModule):
+    :param backbone: neural net to fine-tune
+    :param func_loss: loss function
+    :param learning_rate: learning rate
+    :type learning_rate: float
+    :param train_torch_dataset: train torch iterable dataset
+    :param val_torch_dataset: validation torch iterable dataset
+    :param task: ['multiclass', 'multilabel', 'binary']
+    :param batch_size: batch size
+    :type batch_size: int
+    :param num_classes: if task is 'multiclass'
+    :type num_classes: int
+    :param num_labels: if task is 'multilabel'
+    :type num_labels: int
+    :param train_torch_dataset: prediction torch iterable dataset
+
+    :raises ValueError: if task is multiclass then num_classes must be initialized,
+    if task is multilabel then num_labels must be initialized,
+    if you use predcit step when  pred_torch_dataset is None.
+
+    :return: tensor
+    '''
 
     def __init__(self, backbone, func_loss, learning_rate, train_torch_dataset, val_torch_dataset, task, batch_size,
                  num_classes=None, num_labels=None, pred_torch_dataset=None):
@@ -125,8 +149,8 @@ class Segmentator (pl.LightningModule):
         avg_acc = torch.stack([x for x in self.vl_ac]).mean()
         # tensorboard_logs = {'avg_val_loss': avg_loss}
         # use key 'log'
-        print(avg_loss)
-        print(avg_acc)
+        print(avg_loss)# ТУТ НУЖНО СДЕЛАТЬ КРАСИВЕЕ
+        print(avg_acc)#
         self.vl_loss = []
         self.vl_ac = []
         return {'val_loss': avg_loss, "val_acc": avg_acc}  # , 'log': tensorboard_logs}
