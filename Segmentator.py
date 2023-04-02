@@ -1,26 +1,34 @@
 import torch
-import torch.nn.functional as F
 from torch.optim import Adam
 from torchmetrics.functional import accuracy
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import pytorch_lightning as pl
-import pandas as pd
-from sklearn.model_selection import train_test_split
 
-from apps import UrDataset
 
 
 class Segmentator (pl.LightningModule):
 
-    def __init__(self, backbone, learning_rate, train_torch_dataset, val_torch_dataset, batch_size=10, pred_torch_dataset=None):
+    def __init__(self, backbone, func_loss, learning_rate, train_torch_dataset, val_torch_dataset, task, batch_size,
+                 num_classes=None, num_labels=None, pred_torch_dataset=None):
         super().__init__()
 
         self.model = backbone
+        self.func_loss = func_loss
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.train_torch_dataset = train_torch_dataset
         self.val_torch_dataset = val_torch_dataset
         self.pred_torch_dataset = pred_torch_dataset
+        self.task = task
+        self.num_classes = num_classes
+        self.num_labels = num_labels
+
+        if self.task == 'multiclass' and self.num_classes is None:
+            raise ValueError("if task is multiclass then num_classes must be initialized")
+        elif self.task == 'multilabel' and self.num_labels is None:
+            raise ValueError("if task is multilabel then num_labels must be initialized")
+
+
 
         self.vl_loss = []
         self.vl_ac = []
@@ -34,7 +42,7 @@ class Segmentator (pl.LightningModule):
         labels = batch[1]
 
         logits = self(input_ids)
-        loss = F.binary_cross_entropy(logits, labels)
+        loss = self.func_loss(logits, labels)
         self.log("train_loss", loss)
 
         return loss
@@ -44,9 +52,10 @@ class Segmentator (pl.LightningModule):
         labels = batch[1]
 
         logits = self(input_ids)
-        loss = F.binary_cross_entropy(logits, labels)
+        loss = self.func_loss(logits, labels)
 
-        acc = accuracy(logits.squeeze() ,labels.squeeze().to(torch.int), task="binary") #<--check this
+        acc = accuracy(logits.squeeze() ,labels.squeeze().to(torch.int), task=self.task, num_labels=self.num_labels,
+                       num_classes=self.num_classes) #<--check this
 
         metrics = {"val_loss": loss, "val_acc": acc}
         self.log_dict(metrics)
@@ -120,7 +129,7 @@ class Segmentator (pl.LightningModule):
         print(avg_acc)
         self.vl_loss = []
         self.vl_ac = []
-        return {'val_loss': avg_loss, "val_acc": avg_acc  }  # , 'log': tensorboard_logs}
+        return {'val_loss': avg_loss, "val_acc": avg_acc}  # , 'log': tensorboard_logs}
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(),
