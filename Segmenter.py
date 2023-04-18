@@ -23,6 +23,7 @@ class Segmenter (pl.LightningModule):
     :type num_classes: int
     :param num_labels: if task is 'multilabel'
     :type num_labels: int
+    :param train_torch_dataset: prediction torch iterable dataset
 
     :raises ValueError: if task is multiclass then num_classes must be initialized,
     if task is multilabel then num_labels must be initialized,
@@ -32,7 +33,7 @@ class Segmenter (pl.LightningModule):
     '''
 
     def __init__(self, backbone, func_loss, learning_rate, train_torch_dataset, val_torch_dataset, task, batch_size,
-                 num_classes=None, num_labels=None):
+                 num_classes=None, num_labels=None, pred_torch_dataset=None):
         super().__init__()
 
         self.model = backbone
@@ -41,6 +42,7 @@ class Segmenter (pl.LightningModule):
         self.learning_rate = learning_rate
         self.train_torch_dataset = train_torch_dataset
         self.val_torch_dataset = val_torch_dataset
+        self.pred_torch_dataset = pred_torch_dataset
         self.task = task
         self.num_classes = num_classes
         self.num_labels = num_labels
@@ -87,6 +89,13 @@ class Segmenter (pl.LightningModule):
 
         return metrics
 
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        input_ids = batch[0]
+
+        preds = self(input_ids)
+
+        return preds
+
     def train_dataloader(self):
         train_dataloader = DataLoader(
             self.train_torch_dataset,
@@ -100,6 +109,15 @@ class Segmenter (pl.LightningModule):
             batch_size=self.batch_size
         )
         return validation_dataloader
+
+    def predict_dataloader(self):
+        if self.pred_torch_dataset is None:
+            raise ValueError("pred_torch_dataset is None")
+        pred_dataloader = DataLoader(
+            self.pred_torch_dataset,
+            batch_size=self.batch_size
+        )
+        return pred_dataloader
 
     def on_validation_epoch_end(self):
         val_loss_mean = torch.mean(self.vl_loss)
