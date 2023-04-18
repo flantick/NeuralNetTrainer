@@ -23,7 +23,7 @@ class Segmenter (pl.LightningModule):
     :type num_classes: int
     :param num_labels: if task is 'multilabel'
     :type num_labels: int
-    :param train_torch_dataset: prediction torch iterable dataset
+    :param pred_torch_dataset: prediction torch iterable dataset
 
     :raises ValueError: if task is multiclass then num_classes must be initialized,
     if task is multilabel then num_labels must be initialized,
@@ -115,7 +115,7 @@ class Segmenter (pl.LightningModule):
             raise ValueError("pred_torch_dataset is None")
         pred_dataloader = DataLoader(
             self.pred_torch_dataset,
-            batch_size=self.batch_size
+            batch_size=1
         )
         return pred_dataloader
 
