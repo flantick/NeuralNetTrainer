@@ -73,9 +73,9 @@ class Segmenter (pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         input_ids, labels = batch
-        with torch.no_grad():
-            logits = self(input_ids)
-            loss = self.func_loss(logits, labels)
+
+        logits = self(input_ids)
+        loss = self.func_loss(logits, labels)
 
         acc = accuracy(logits.squeeze(), labels.squeeze().to(torch.int), task=self.task, num_labels=self.num_labels,
                        num_classes=self.num_classes)
