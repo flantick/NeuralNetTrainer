@@ -1,5 +1,4 @@
 import torch
-from torch.optim import Adam
 from torchmetrics.functional import accuracy
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
@@ -12,8 +11,7 @@ class Segmenter (pl.LightningModule):
 
     :param backbone: neural net to fine-tune
     :param func_loss: loss function
-    :param learning_rate: learning rate
-    :type learning_rate: float
+    :param optimizer: optimizer
     :param train_torch_dataset: train torch iterable dataset
     :param val_torch_dataset: validation torch iterable dataset
     :param task: ['multiclass', 'multilabel', 'binary']
@@ -32,14 +30,14 @@ class Segmenter (pl.LightningModule):
     :return: tensor
     '''
 
-    def __init__(self, backbone, func_loss, learning_rate, train_torch_dataset, val_torch_dataset, task, batch_size,
+    def __init__(self, backbone, func_loss, optimizer, train_torch_dataset, val_torch_dataset, task, batch_size,
                  num_classes=None, num_labels=None, pred_torch_dataset=None):
         super().__init__()
 
         self.model = backbone
         self.func_loss = func_loss
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.optimizer = optimizer
         self.train_torch_dataset = train_torch_dataset
         self.val_torch_dataset = val_torch_dataset
         self.pred_torch_dataset = pred_torch_dataset
@@ -132,8 +130,4 @@ class Segmenter (pl.LightningModule):
         return {'val_loss': val_loss_mean, "val_acc": val_acc_mean}
 
     def configure_optimizers(self):
-        optimizer = Adam(self.parameters(),
-                         lr=self.learning_rate,
-                         )
-
-        return {"optimizer": optimizer}
+        return {"optimizer": self.optimizer}
