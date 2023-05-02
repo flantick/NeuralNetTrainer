@@ -10,7 +10,7 @@ from Segmenter import Segmenter
 backbone = ...
 optimizer = ...
 
-model = Segmenter(backbone, optimizer, learning_rate, train_dataset, val_dataset, task_type, num_labels=num_labels,
+model = Segmenter(backbone, optimizer, train_dataset, val_dataset, task_type, num_labels=num_labels,
                   batch_size=batch_size, pred_torch_dataset=pred_dataset)
 
 trainer = pl.Trainer(
