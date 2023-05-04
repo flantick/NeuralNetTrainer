@@ -2,9 +2,11 @@ import torch
 from torchmetrics.functional import accuracy
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
+from typing import Optional
+from typing_extensions import Literal
 
 
-class Segmenter (pl.LightningModule):
+class Segmenter(pl.LightningModule):
     '''
     Segmenter fine-tune neural net to segments images.
     You need to prepare the dataset and backbone in advance.
@@ -23,15 +25,29 @@ class Segmenter (pl.LightningModule):
     :type num_labels: int
     :param pred_torch_dataset: prediction torch iterable dataset
 
-    :raises ValueError: if task is multiclass then num_classes must be initialized,
+    :raises ValueError:
+    If you want to train model , but func_loss or optimizer or val_torch_dataset or task is not defined
+    if task is multiclass then num_classes must be initialized,
     if task is multilabel then num_labels must be initialized,
-    if you use predcit step when  pred_torch_dataset is None.
+    if val_dataloader has been called, but val_torch_dataset is None
+    if train_dataloader has been called, but train_torch_dataset is None
+    if predict_dataloader has been called, but pred_torch_dataset is None
 
     :return: tensor
     '''
 
-    def __init__(self, backbone, func_loss, optimizer, train_torch_dataset, val_torch_dataset, task, batch_size,
-                 num_classes=None, num_labels=None, pred_torch_dataset=None):
+    def __init__(self,
+                 backbone,
+                 func_loss=None,
+                 optimizer=None,
+                 train_torch_dataset=None,
+                 val_torch_dataset=None,
+                 task: Optional[Literal["binary", "multiclass", "multilabel"]] = None,
+                 batch_size: int = 2,
+                 num_classes: Optional[int] = None,
+                 num_labels: Optional[int] = None,
+                 pred_torch_dataset=None
+                 ):
         super().__init__()
 
         self.model = backbone
@@ -45,12 +61,15 @@ class Segmenter (pl.LightningModule):
         self.num_classes = num_classes
         self.num_labels = num_labels
 
+        if train_torch_dataset is not None and (self.func_loss is None or self.optimizer is None or
+                                                self.val_torch_dataset is None or self.task is None):
+            raise ValueError("If you want to train model then func_loss, optimizer, train_torch_dataset, "
+                             "val_torch_dataset and task must be defined")
+
         if self.task == 'multiclass' and self.num_classes is None:
             raise ValueError("if task is multiclass then num_classes must be initialized")
         elif self.task == 'multilabel' and self.num_labels is None:
             raise ValueError("if task is multilabel then num_labels must be initialized")
-
-
 
         self.vl_loss = torch.Tensor([])
         self.vl_acc = torch.Tensor([])
@@ -95,6 +114,8 @@ class Segmenter (pl.LightningModule):
         return preds
 
     def train_dataloader(self):
+        if self.train_torch_dataset is None:
+            raise ValueError("train_dataloader has been called, but train_torch_dataset is None")
         train_dataloader = DataLoader(
             self.train_torch_dataset,
             batch_size=self.batch_size
@@ -102,6 +123,8 @@ class Segmenter (pl.LightningModule):
         return train_dataloader
 
     def val_dataloader(self):
+        if self.val_torch_dataset is None:
+            raise ValueError("val_dataloader has been called, but val_torch_dataset is None")
         validation_dataloader = DataLoader(
             self.val_torch_dataset,
             batch_size=self.batch_size
@@ -110,7 +133,7 @@ class Segmenter (pl.LightningModule):
 
     def predict_dataloader(self):
         if self.pred_torch_dataset is None:
-            raise ValueError("pred_torch_dataset is None")
+            raise ValueError("predict_dataloader has been called, but pred_torch_dataset is None")
         pred_dataloader = DataLoader(
             self.pred_torch_dataset,
             batch_size=1
