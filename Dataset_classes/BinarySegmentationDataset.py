@@ -1,17 +1,13 @@
 import torch
 import torchvision
-import torchvision.transforms as T
-import pandas as pd
 import numpy as np
 import random
 from torchvision.io import read_image
+import cv2
+from scipy import ndimage
 
 
-'''
-This class for the semantic_segmentation.ipynb
-'''
-
-class ImageSegmentationDataset(torch.utils.data.IterableDataset):
+class BinarySegmentationDataset(torch.utils.data.IterableDataset):
     """
 Dataset for image segmentation tasks.
 
@@ -37,17 +33,16 @@ Methods:
     pt_rgb_to_mask(img, color_map): Converts an RGB image mask to a binary mask.
 
 Example:
-    >>> train_dataset = ImageSegmentationDataset(train_df, normalize_func, color_map, with_target=True, shuffle=True)
+    >>> train_dataset = SematicSegmentationDataset(train_df, normalize_func, color_map, with_target=True, shuffle=True)
     >>> train_loader = DataLoader(train_dataset, batch_size=batch_size)
 """
 
-    def __init__(self, dataframe, normalize_func, color_map, with_target=True, shuffle=False):
+    def __init__(self, dataframe, normalize_func, with_target=True, shuffle=False):
         super().__init__()
         self.dataframe = dataframe
         self.with_target = with_target
         self.shuffle = shuffle
         self.normalize = normalize_func
-        self.color_map = color_map
 
     def __len__(self):
         return len(self.dataframe)
@@ -60,15 +55,14 @@ Example:
 
         for i in list_of_dataframe_indexes:
 
-            img_name = self.dataframe.iloc[i][0]
-
-            if self.with_target:
-                mask_name = img_name[:16]+'segmentation'+img_name[22:]
-                mask = self.readmask(mask_name)
-            else:
-                mask = torch.zeros(1)
+            img_name, mask_rle = self.dataframe.iloc[i]
 
             img = self.readimg(img_name)
+
+            if self.with_target:
+                mask = self.readmask(mask_rle, (img.shape[2], img.shape[1], 1))
+            else:
+                mask = torch.zeros(1)
 
             yield img, mask
 
@@ -79,30 +73,26 @@ Example:
         img = self.normalize(img)
         return img
 
-    def readmask(self, mask_name):
-        mask = read_image(mask_name, mode=torchvision.io.image.ImageReadMode.RGB)
+    def readmask(self, mask_rle, shape):
+        '''
+        mask_rle: run-length as string formated (start length)
+        shape: (height,width) of array to return
+        Returns numpy array, 1 - mask, 0 - background
+        '''
+        img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
 
-        mask = T.ToPILImage()(mask)
-        mask_np = np.asarray(mask, dtype='uint8')
-        mask_np = ImageSegmentationDataset.pt_rgb_to_mask(mask_np, self.color_map)
-        mask = torch.asarray(mask_np)
+        s = mask_rle.split()
+        starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+        starts -= 1
+        ends = starts + lengths
+        for lo, hi in zip(starts, ends):
+            img[lo:hi] = 1
+
+        mask = img.reshape(shape)
+        mask = ndimage.rotate(mask, -90)
+        mask = cv2.flip(mask, 1)
+        mask = torch.from_numpy(mask)
         mask = mask.float()
-        return mask
+        mask = torch.unsqueeze(mask, 0)
 
-    @staticmethod
-    def pt_rgb_to_mask(img, color_map):
-        '''
-        Converts a RGB image mask of shape [batch_size, h, w, 3] to Binary Mask of shape [batch_size, classes, h, w]
-        Parameters:
-            img: A RGB img mask
-            color_map: Dictionary representing color mappings
-        returns:
-            out: A Binary Mask of shape [batch_size, classes, h, w]
-        '''
-        num_classes = len(color_map)
-        shape = (num_classes,)+img.shape[:2]
-        out = np.zeros(shape, dtype=np.int8)
-        for i, cls in enumerate(color_map):
-            res = np.all(img.reshape( (-1,3) ) == color_map[i], axis=1).reshape(shape[1:])
-            out[i,:,:] = res
-        return out
+        return mask
