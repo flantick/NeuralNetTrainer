@@ -11,7 +11,7 @@ class Segmenter(pl.LightningModule):
     Segmenter fine-tune neural net to segments images.
     You need to prepare the dataset and backbone in advance.
 
-    :param backbone: neural net to fine-tune
+    :param backbone: pytorch neural net to fine-tune
     :param func_loss: loss function
     :param optimizer: optimizer
     :param train_torch_dataset: train torch iterable dataset
@@ -24,14 +24,16 @@ class Segmenter(pl.LightningModule):
     :param num_labels: if task is 'multilabel'
     :type num_labels: int
     :param pred_torch_dataset: prediction torch iterable dataset
+    :param get_loss_and_logits_fn: function that returns loss and logits
 
     :raises ValueError:
-    If you want to train model , but func_loss or optimizer or val_torch_dataset or task is not defined
+    If you want to train model , but optimizer or val_torch_dataset or task is not defined
     if task is multiclass then num_classes must be initialized,
     if task is multilabel then num_labels must be initialized,
     if val_dataloader has been called, but val_torch_dataset is None
     if train_dataloader has been called, but train_torch_dataset is None
     if predict_dataloader has been called, but pred_torch_dataset is None
+    if get_loss_and_logits has been called, but self.func_loss is None
 
     :return: tensor
     '''
@@ -46,7 +48,8 @@ class Segmenter(pl.LightningModule):
                  batch_size: int = 2,
                  num_classes: Optional[int] = None,
                  num_labels: Optional[int] = None,
-                 pred_torch_dataset=None
+                 pred_torch_dataset=None,
+                 get_loss_and_logits_fn=None
                  ):
         super().__init__()
 
@@ -61,7 +64,12 @@ class Segmenter(pl.LightningModule):
         self.num_classes = num_classes
         self.num_labels = num_labels
 
-        if train_torch_dataset is not None and (self.func_loss is None or self.optimizer is None or
+        if get_loss_and_logits_fn is not None:
+            self.get_loss_and_logits_fn = get_loss_and_logits_fn
+        else:
+            self.get_loss_and_logits_fn = Segmenter.get_loss_and_logits
+
+        if train_torch_dataset is not None and (self.optimizer is None or
                                                 self.val_torch_dataset is None or self.task is None):
             raise ValueError("If you want to train model then func_loss, optimizer, train_torch_dataset, "
                              "val_torch_dataset and task must be defined")
@@ -71,28 +79,19 @@ class Segmenter(pl.LightningModule):
         elif self.task == 'multilabel' and self.num_labels is None:
             raise ValueError("if task is multilabel then num_labels must be initialized")
 
+
         self.vl_loss = torch.Tensor([])
         self.vl_acc = torch.Tensor([])
 
-    def forward(self, input_ids):
-        x = self.model(input_ids)
-        return x
-
     def training_step(self, batch, batch_idx):
-        input_ids = batch[0]
-        labels = batch[1]
-
-        logits = self(input_ids)
-        loss = self.func_loss(logits, labels)
+        loss, logits = self.get_loss_and_logits_fn(self, batch)
         self.log("train_loss", loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        input_ids, labels = batch
-
-        logits = self(input_ids)
-        loss = self.func_loss(logits, labels)
+        loss, logits = self.get_loss_and_logits_fn(self, batch)
+        labels = batch[1]
 
         acc = accuracy(logits.squeeze(), labels.squeeze().to(torch.int), task=self.task, num_labels=self.num_labels,
                        num_classes=self.num_classes)
@@ -107,9 +106,7 @@ class Segmenter(pl.LightningModule):
         return metrics
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        input_ids = batch[0]
-
-        preds = self(input_ids)
+        loss, preds = self.get_loss_and_logits_fn(self, batch, False)
 
         return preds
 
@@ -154,3 +151,14 @@ class Segmenter(pl.LightningModule):
 
     def configure_optimizers(self):
         return {"optimizer": self.optimizer}
+
+    @staticmethod
+    def get_loss_and_logits(segmenter_object, batch, calculate_loss=True):
+        if segmenter_object.func_loss is None:
+            raise ValueError("func_loss not defined")
+        input_ids, labels = batch
+        loss = 0
+        logits = segmenter_object.model(input_ids)
+        if calculate_loss:
+            loss = segmenter_object.func_loss(logits, labels)
+        return loss, logits
