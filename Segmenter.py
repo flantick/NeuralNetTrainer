@@ -24,7 +24,9 @@ class Segmenter(pl.LightningModule):
     :param num_labels: if task is 'multilabel'
     :type num_labels: int
     :param pred_torch_dataset: prediction torch iterable dataset
-    :param get_loss_and_logits_fn: function that returns loss and logits
+    :param specify_forward_step: function that specify forward step
+    :param specify_get_loss: function that specify get loss
+    :param  specify_get_accuracy: function that specify get accuracy
 
     :raises ValueError:
     If you want to train model , but optimizer or val_torch_dataset or task is not defined
@@ -49,7 +51,9 @@ class Segmenter(pl.LightningModule):
                  num_classes: Optional[int] = None,
                  num_labels: Optional[int] = None,
                  pred_torch_dataset=None,
-                 get_loss_and_logits_fn=None
+                 specify_forward_step=None,
+                 specify_get_loss=None,
+                 specify_get_accuracy=None
                  ):
         super().__init__()
 
@@ -64,10 +68,22 @@ class Segmenter(pl.LightningModule):
         self.num_classes = num_classes
         self.num_labels = num_labels
 
-        if get_loss_and_logits_fn is not None:
-            self.get_loss_and_logits_fn = get_loss_and_logits_fn
+        if specify_forward_step is not None:
+            self.forward_step = specify_forward_step
+            print("if you specify forward step then you should generally specify 'specify_get_loss', and 'specify_get_accuracy'")
         else:
-            self.get_loss_and_logits_fn = Segmenter.get_loss_and_logits
+            self.forward_step = Segmenter.default_forward_step
+
+        if specify_get_loss is not None:
+            self.get_loss = specify_get_loss
+        else:
+            self.get_loss = Segmenter.default_get_loss
+
+        if specify_get_accuracy is not None:
+            self.get_accuracy = specify_get_accuracy
+        else:
+            self.get_accuracy = Segmenter.default_get_acc
+
 
         if train_torch_dataset is not None and (self.optimizer is None or
                                                 self.val_torch_dataset is None or self.task is None):
@@ -83,19 +99,21 @@ class Segmenter(pl.LightningModule):
         self.vl_loss = torch.Tensor([])
         self.vl_acc = torch.Tensor([])
 
+    def forward(self, *args, **kwargs):
+        x = self.forward_step(self.model, *args, **kwargs)
+        return x
+
     def training_step(self, batch, batch_idx):
-        loss, logits = self.get_loss_and_logits_fn(self, batch)
+        preds = self(batch)
+        loss = self.get_loss(self, preds, batch)
         self.log("train_loss", loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss, logits = self.get_loss_and_logits_fn(self, batch)
-        labels = batch[1]
-
-        acc = accuracy(logits.squeeze(), labels.squeeze().to(torch.int), task=self.task, num_labels=self.num_labels,
-                       num_classes=self.num_classes)
-
+        preds = self(batch)
+        loss = self.get_loss(self, preds, batch)
+        acc = self.get_accuracy(self, preds, batch)
         metrics = {"val_loss": loss, "val_acc": acc}
         self.log("val_loss", loss)
         self.log("val_acc", acc)
@@ -106,8 +124,7 @@ class Segmenter(pl.LightningModule):
         return metrics
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        loss, preds = self.get_loss_and_logits_fn(self, batch, False)
-
+        preds = self(batch)
         return preds
 
     def train_dataloader(self):
@@ -153,12 +170,24 @@ class Segmenter(pl.LightningModule):
         return {"optimizer": self.optimizer}
 
     @staticmethod
-    def get_loss_and_logits(segmenter_object, batch, calculate_loss=True):
-        if segmenter_object.func_loss is None:
-            raise ValueError("func_loss not defined")
-        input_ids, labels = batch
-        loss = 0
-        logits = segmenter_object.model(input_ids)
-        if calculate_loss:
-            loss = segmenter_object.func_loss(logits, labels)
-        return loss, logits
+    def default_forward_step(model, batch):
+        input_ids = batch[0]
+        x = model(input_ids)
+        return x
+
+    @staticmethod
+    def default_get_loss(segmenter_object, preds, batch):
+        target = batch[1]
+        loss = segmenter_object.func_loss(preds, target)
+        return loss
+
+    @staticmethod
+    def default_get_acc(segmenter_object, preds, batch):
+        target = batch[1]
+        acc = accuracy(preds.squeeze(),
+                       target.squeeze().to(torch.int),
+                       task=segmenter_object.task,
+                       num_labels=segmenter_object.num_labels,
+                       num_classes=segmenter_object.num_classes
+                       )
+        return acc
