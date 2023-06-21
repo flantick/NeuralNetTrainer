@@ -6,9 +6,9 @@ from typing import Optional
 from typing_extensions import Literal
 
 
-class Segmenter(pl.LightningModule):
+class NeuralNetTrainer(pl.LightningModule):
     '''
-    Segmenter fine-tune neural net to segments images.
+    A class for training and evaluating a PyTorch neural network.
     You need to prepare the dataset and backbone in advance.
 
     :param backbone: pytorch neural net to fine-tune
@@ -24,9 +24,12 @@ class Segmenter(pl.LightningModule):
     :param num_labels: if task is 'multilabel'
     :type num_labels: int
     :param pred_torch_dataset: prediction torch iterable dataset
-    :param specify_forward_step: function that specify forward step
-    :param specify_get_loss: function that specify get loss
-    :param  specify_get_accuracy: function that specify get accuracy
+    :param specify_forward_step: function that specify forward step (commonly used with pre-trained bert models,
+    check the default function in the source code)
+    :param specify_get_loss: function that specify get loss (commonly used with pre-trained bert models,
+    check the default function in the source code)
+    :param  specify_get_accuracy: function that specify get accuracy (commonly used with pre-trained bert models,
+    check the default function in the source code)
 
     :raises ValueError:
     If you want to train model , but optimizer or val_torch_dataset or task is not defined
@@ -72,17 +75,17 @@ class Segmenter(pl.LightningModule):
             self.forward_step = specify_forward_step
             print("if you specify forward step then you should generally specify 'specify_get_loss', and 'specify_get_accuracy'")
         else:
-            self.forward_step = Segmenter.default_forward_step
+            self.forward_step = NeuralNetTrainer.default_forward_step
 
         if specify_get_loss is not None:
             self.get_loss = specify_get_loss
         else:
-            self.get_loss = Segmenter.default_get_loss
+            self.get_loss = NeuralNetTrainer.default_get_loss
 
         if specify_get_accuracy is not None:
             self.get_accuracy = specify_get_accuracy
         else:
-            self.get_accuracy = Segmenter.default_get_acc
+            self.get_accuracy = NeuralNetTrainer.default_get_acc
 
 
         if train_torch_dataset is not None and (self.optimizer is None or

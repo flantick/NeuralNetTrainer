@@ -1,17 +1,24 @@
-# Segmenter
-The Segmenter class is a PyTorch Lightning module for fine-tuning a neural network to segment images. To use this module, you need to initialize an instance of the Segmenter class with the required arguments. Then, you can train the model using the fit method provided by PyTorch Lightning.
+# NeuralNetTrainer
+ A class for training and evaluating PyTorch neural networks. It provides a convenient interface for training and 
+ fine-tuning neural networks using custom loss functions, optimizers, and 
+ datasets. This class is suitable for various tasks such as classification. 
+ It handles key functionalities like training, validation, and prediction. 
+ It simplifies the process of training neural networks and allows for easy 
+ customization.
 
 ## Usage
+
 ```python
-from Segmenter import Segmenter
+from NeuralNetTrainer import NeuralNetTrainer
 
 ...
 
 backbone = ...
 optimizer = ...
+loss_func = ...
 
-model = Segmenter(backbone, optimizer, train_dataset, val_dataset, task_type, num_labels=num_labels,
-                  batch_size=batch_size, pred_torch_dataset=pred_dataset)
+model = NeuralNetTrainer(backbone, loss_func, optimizer, train_dataset, val_dataset, task_type, num_labels=num_labels,
+                         batch_size=batch_size, pred_torch_dataset=pred_dataset)
 
 trainer = pl.Trainer(
     accelerator='gpu',
