@@ -1,7 +1,11 @@
 version: "3"
 services:
   torch:
-    image: flantick/segmenter
+    image: flantick/neuralnettrainer
+    ports:
+      - 8888:8888
+    volumes:
+      - source:target
     deploy:
       resources:
         reservations:

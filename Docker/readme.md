@@ -1,0 +1,1 @@
+this is docker interpreter for run NeuralNetTrainer and examples
