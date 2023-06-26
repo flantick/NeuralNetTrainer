@@ -30,4 +30,6 @@ trainer.fit(model)
 
 ```
 ## Examples
-check [examples_notebooks](examples_notebooks/)
+[binary segmentation](examples_notebooks/binary_segmentation.ipynb)\
+[semantic segmentation](examples_notebooks/semantic_segmentation.ipynb)\
+[bert classification](examples_notebooks/bert_example.ipynb)
